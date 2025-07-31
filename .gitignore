@@ -1,0 +1,47 @@
+# Java
+*.class
+*.log
+*.jar
+*.war
+*.ear
+
+# Eclipse
+.project
+.classpath
+.settings/
+bin/
+tmp/
+
+# macOS
+.DS_Store
+
+# Maven
+target/
+dependency-reduced-pom.xml
+release.properties
+buildNumber.properties
+
+# IntelliJ (형님이 나중에 사용할 수도 있어서 포함)
+.idea/
+*.iml
+out/
+
+# Lombok config
+lombok.config
+
+# OS, 에디터 공통
+*.swp
+*.swo
+*.bak
+*~
+Thumbs.db
+
+# Logs
+logs/
+*.log
+*.tmp
+
+# 환경 변수 설정 파일 (형님이 직접 만든 경우)
+.env
+.env.*
+/target/
