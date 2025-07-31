@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AltRadar - 알트코인 급등 예측 시스템</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            text-align: center;
+        }
+        h1 {
+            font-size: 3em;
+            margin-bottom: 20px;
+        }
+        .status {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+        }
+        .api-links {
+            margin-top: 30px;
+        }
+        .api-links a {
+            color: white;
+            text-decoration: none;
+            background: rgba(255, 255, 255, 0.2);
+            padding: 10px 20px;
+            border-radius: 5px;
+            margin: 10px;
+            display: inline-block;
+        }
+        .api-links a:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚀 AltRadar</h1>
+        <p>알트코인 급등 예측 시스템</p>
+        
+        <div class="status">
+            <h2>✅ 시스템 상태</h2>
+            <p>애플리케이션이 정상적으로 실행되고 있습니다!</p>
+            <p>포트: 8080</p>
+            <p>시작 시간: <span id="startTime"></span></p>
+        </div>
+        
+        <div class="api-links">
+            <h3>API 엔드포인트</h3>
+            <a href="/test">테스트 페이지</a>
+            <a href="/api/status">상태 확인</a>
+            <a href="/h2-console">H2 데이터베이스 콘솔</a>
+        </div>
+    </div>
+    
+    <script>
+        document.getElementById('startTime').textContent = new Date().toLocaleString();
+    </script>
+</body>
+</html> 

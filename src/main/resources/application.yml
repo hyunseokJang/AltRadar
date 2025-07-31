@@ -1,0 +1,67 @@
+spring:
+  application:
+    name: altradar
+  
+  datasource:
+    url: jdbc:h2:mem:altradar
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: 
+  
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+  
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.H2Dialect
+        format_sql: true
+  
+  thymeleaf:
+    cache: false
+    prefix: classpath:/templates/
+    suffix: .html
+    encoding: UTF-8
+    mode: HTML
+
+server:
+  port: 8080
+  servlet:
+    context-path: /
+
+logging:
+  level:
+    com.altradar: DEBUG
+    org.springframework.web: INFO
+    org.hibernate.SQL: DEBUG
+    org.hibernate.type.descriptor.sql.BasicBinder: TRACE
+
+# CoinGecko API 설정
+coingecko:
+  api:
+    base-url: https://api.coingecko.com/api/v3
+    rate-limit: 1000 # API 호출 제한 (밀리초)
+
+# 기술적 분석 설정
+technical-analysis:
+  rsi-period: 14
+  macd-fast: 12
+  macd-slow: 26
+  macd-signal: 9
+  sma-short: 20
+  sma-long: 50
+  bollinger-period: 20
+  bollinger-std-dev: 2.0
+  volatility-period: 20
+  momentum-period: 10
+
+# 급등 예측 설정
+pump-prediction:
+  min-score: 70
+  max-risk-level: MEDIUM
+  update-interval: 3600000 # 1시간 (밀리초) 
