@@ -14,7 +14,7 @@
             min-height: 100vh;
         }
         .container {
-            max-width: 800px;
+            max-width: 1200px;
             margin: 0 auto;
             text-align: center;
         }
@@ -27,6 +27,13 @@
             padding: 20px;
             border-radius: 10px;
             margin: 20px 0;
+        }
+        .api-section {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+            text-align: left;
         }
         .api-links {
             margin-top: 30px;
@@ -43,12 +50,43 @@
         .api-links a:hover {
             background: rgba(255, 255, 255, 0.3);
         }
+        .button {
+            background: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+            font-size: 14px;
+        }
+        .button:hover {
+            background: #45a049;
+        }
+        .button:disabled {
+            background: #cccccc;
+            cursor: not-allowed;
+        }
+        .log {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+            text-align: left;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        .success { color: #4CAF50; }
+        .error { color: #f44336; }
+        .info { color: #2196F3; }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>🚀 AltRadar</h1>
-        <p>알트코인 급등 예측 시스템</p>
+        <p>알트코인 급등 예측 시스템 (Upbit API)</p>
         
         <div class="status">
             <h2>✅ 시스템 상태</h2>
@@ -57,16 +95,104 @@
             <p>시작 시간: <span id="startTime"></span></p>
         </div>
         
+        <div class="api-section">
+            <h3>📊 Upbit 데이터 수집</h3>
+            <p>Upbit API를 통해 실시간 암호화폐 데이터를 수집합니다.</p>
+            
+            <div>
+                <button class="button" onclick="collectCurrentData()">현재 시세 수집</button>
+                <button class="button" onclick="collectHistoricalData()">과거 데이터 수집</button>
+                <button class="button" onclick="getUpbitStatus()">Upbit API 상태 확인</button>
+            </div>
+            
+            <div class="log" id="log">
+                <div class="info">로그가 여기에 표시됩니다...</div>
+            </div>
+        </div>
+        
         <div class="api-links">
-            <h3>API 엔드포인트</h3>
+            <h3>🔗 API 엔드포인트</h3>
             <a href="/test">테스트 페이지</a>
             <a href="/api/status">상태 확인</a>
+            <a href="/api/upbit/status">Upbit API 상태</a>
             <a href="/h2-console">H2 데이터베이스 콘솔</a>
         </div>
     </div>
     
     <script>
         document.getElementById('startTime').textContent = new Date().toLocaleString();
+        
+        function addLog(message, type = 'info') {
+            const log = document.getElementById('log');
+            const div = document.createElement('div');
+            div.className = type;
+            div.textContent = new Date().toLocaleTimeString() + ': ' + message;
+            log.appendChild(div);
+            log.scrollTop = log.scrollHeight;
+        }
+        
+        async function collectCurrentData() {
+            try {
+                addLog('현재 시세 데이터 수집 시작...', 'info');
+                
+                const response = await fetch('/api/upbit/collect', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                const result = await response.json();
+                
+                if (result.status === 'success') {
+                    addLog('✅ ' + result.message, 'success');
+                } else {
+                    addLog('❌ ' + result.message, 'error');
+                }
+            } catch (error) {
+                addLog('❌ 오류 발생: ' + error.message, 'error');
+            }
+        }
+        
+        async function collectHistoricalData() {
+            try {
+                addLog('과거 데이터 수집 시작...', 'info');
+                
+                const response = await fetch('/api/upbit/collect/historical', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                const result = await response.json();
+                
+                if (result.status === 'success') {
+                    addLog('✅ ' + result.message, 'success');
+                } else {
+                    addLog('❌ ' + result.message, 'error');
+                }
+            } catch (error) {
+                addLog('❌ 오류 발생: ' + error.message, 'error');
+            }
+        }
+        
+        async function getUpbitStatus() {
+            try {
+                addLog('Upbit API 상태 확인 중...', 'info');
+                
+                const response = await fetch('/api/upbit/status');
+                const result = await response.json();
+                
+                if (result.status === 'running') {
+                    addLog('✅ Upbit API 서비스가 정상 실행 중입니다', 'success');
+                } else {
+                    addLog('❌ Upbit API 서비스에 문제가 있습니다', 'error');
+                }
+            } catch (error) {
+                addLog('❌ 오류 발생: ' + error.message, 'error');
+            }
+        }
     </script>
 </body>
 </html> 

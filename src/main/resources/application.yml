@@ -21,6 +21,7 @@ spring:
       hibernate:
         dialect: org.hibernate.dialect.H2Dialect
         format_sql: true
+        use_sql_comments: true
   
   thymeleaf:
     cache: false
@@ -37,9 +38,16 @@ server:
 logging:
   level:
     com.altradar: DEBUG
-    org.springframework.web: INFO
+    org.springframework.web: DEBUG
     org.hibernate.SQL: DEBUG
     org.hibernate.type.descriptor.sql.BasicBinder: TRACE
+
+# Upbit API 설정
+upbit:
+  api:
+    base-url: https://api.upbit.com/v1
+    rate-limit: 600 # 분당 요청 제한
+    request-delay: 100 # 요청 간 대기 시간 (ms)
 
 # CoinGecko API 설정
 coingecko:
@@ -56,12 +64,14 @@ technical-analysis:
   sma-short: 20
   sma-long: 50
   bollinger-period: 20
-  bollinger-std-dev: 2.0
+  bollinger-std: 2
   volatility-period: 20
   momentum-period: 10
 
-# 급등 예측 설정
+# 펌프 예측 설정
 pump-prediction:
-  min-score: 70
-  max-risk-level: MEDIUM
-  update-interval: 3600000 # 1시간 (밀리초) 
+  min-volume: 1000000 # 최소 거래량 (KRW)
+  min-price-change: 5.0 # 최소 가격 변화율 (%)
+  rsi-oversold: 30
+  rsi-overbought: 70
+  volatility-threshold: 0.1 

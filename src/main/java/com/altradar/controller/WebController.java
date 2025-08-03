@@ -23,7 +23,7 @@ public class WebController {
     /**
      * 메인 대시보드 페이지
      */
-    @GetMapping("/")
+    @GetMapping("/dashboard")
     public String dashboard(Model model) {
         // 상위 급등 가능성 코인들
         List<CryptoCoin> topPumpCoins = cryptoCoinRepository.findHighPumpPotential(BigDecimal.valueOf(70));
