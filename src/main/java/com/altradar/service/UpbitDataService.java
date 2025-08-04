@@ -1,176 +1,139 @@
+
 package com.altradar.service;
 
-import com.altradar.model.CryptoCoin;
-import com.altradar.model.PriceData;
-import com.altradar.model.dto.UpbitApiResponse;
-import com.altradar.repository.CryptoCoinRepository;
-import com.altradar.repository.PriceDataRepository;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+
+import org.json.JSONArray;
+import org.json.JSONObject;
+import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestTemplate;
+
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.scheduling.annotation.Scheduled;
-import org.springframework.stereotype.Service;
-import org.springframework.web.reactive.function.client.WebClient;
-import reactor.core.publisher.Flux;
 
-import java.math.BigDecimal;
-import java.time.LocalDateTime;
-import java.util.List;
-
+@Slf4j
 @Service
 @RequiredArgsConstructor
-@Slf4j
 public class UpbitDataService {
+	
 
-    private final WebClient webClient;
-    private final CryptoCoinRepository cryptoCoinRepository;
-    private final PriceDataRepository priceDataRepository;
+	// 글로벌 속도 제한 (초당 약 8~9회 요청)
+	private long lastRequestTime = 0;
+	private final long REQUEST_INTERVAL_MS = 120;
 
-    @Value("${upbit.api.base-url:https://api.upbit.com/v1}")
-    private String upbitBaseUrl;
+    private final TechnicalAnalysisService technicalAnalysisService;
+    private final RestTemplate restTemplate;
 
-    // 주요 알트코인 목록 (KRW 마켓)
-    private static final List<String> TARGET_COINS = List.of(
-        "KRW-BTC", "KRW-ETH", "KRW-XRP", "KRW-ADA", "KRW-DOGE",
-        "KRW-MATIC", "KRW-DOT", "KRW-LTC", "KRW-BCH", "KRW-LINK",
-        "KRW-UNI", "KRW-ATOM", "KRW-ETC", "KRW-XLM", "KRW-TRX",
-        "KRW-NEO", "KRW-VET", "KRW-ALGO", "KRW-MANA", "KRW-SAND"
-    );
+    private static final String UPBIT_TICKER_URL = "https://api.upbit.com/v1/ticker?markets=%s";
+    private static final String UPBIT_CANDLES_URL = "https://api.upbit.com/v1/candles/minutes/1?market=%s&count=200";
 
-    /**
-     * Upbit에서 현재 시세 데이터를 수집합니다.
-     */
-    public void collectCurrentData() {
-        log.info("Upbit에서 현재 시세 데이터 수집 시작");
-        
+    public Map<String, Object> getMarketAnalysis(String market) {
         try {
-            // 모든 코인 데이터를 한 번에 조회
-            List<UpbitApiResponse> marketData = webClient.get()
-                .uri(upbitBaseUrl + "/ticker?markets=" + String.join(",", TARGET_COINS))
-                .retrieve()
-                .bodyToFlux(UpbitApiResponse.class)
-                .collectList()
-                .block();
+            // 가격 데이터 가져오기
+            String candleUrl = String.format(UPBIT_CANDLES_URL, market);
+            JSONArray candles = new JSONArray(restTemplate.getForObject(candleUrl, String.class));
 
-            if (marketData != null) {
-                for (UpbitApiResponse apiResponse : marketData) {
-                    processCoinData(apiResponse);
-                }
-                log.info("{}개 코인의 데이터 수집 완료", marketData.size());
+            List<Double> prices = new ArrayList<>();
+            List<Double> volumes = new ArrayList<>();
+
+            for (int i = candles.length() - 1; i >= 0; i--) {
+                JSONObject candle = candles.getJSONObject(i);
+                prices.add(candle.getDouble("trade_price"));
+                volumes.add(candle.getDouble("candle_acc_trade_volume"));
             }
+
+            // 분석 실행
+            Map<String, Object> analysis = technicalAnalysisService.analyze(prices, volumes);
+
+            // 현재가 정보
+            String tickerUrl = String.format(UPBIT_TICKER_URL, market);
+            JSONArray tickerArr = new JSONArray(restTemplate.getForObject(tickerUrl, String.class));
+            JSONObject ticker = tickerArr.getJSONObject(0);
+
+            Map<String, Object> result = new HashMap<>();
+            result.put("symbol", market);
+            result.put("price", ticker.getDouble("trade_price"));
+            result.putAll(analysis);
+
+            return result;
         } catch (Exception e) {
-            log.error("Upbit 데이터 수집 중 오류 발생: {}", e.getMessage(), e);
+            log.error("Error fetching market analysis for {}: {}", market, e.getMessage());
+            return null;
         }
     }
 
-    /**
-     * 개별 코인 데이터를 처리합니다.
-     */
-    private void processCoinData(UpbitApiResponse apiResponse) {
-        try {
-            String coinId = apiResponse.getCoinId();
-            String symbol = apiResponse.getSymbol();
-            
-            // 기존 코인 정보 조회 또는 새로 생성
-            CryptoCoin coin = cryptoCoinRepository.findByCoinId(coinId)
-                .orElse(new CryptoCoin());
+    public List<Map<String, Object>> getMultipleMarketAnalysis(List<String> markets) {
+        List<Map<String, Object>> results = new ArrayList<>();
 
-            // 코인 정보 업데이트
-            coin.setCoinId(coinId);
-            coin.setSymbol(symbol);
-            coin.setName(symbol); // Upbit는 심볼만 제공하므로 이름도 심볼로 설정
-            coin.setCurrentPrice(apiResponse.getTradePrice());
-            coin.setMarketCap(apiResponse.getAccTradePrice24h()); // 24시간 거래대금을 시가총액으로 사용
-            coin.setVolume24h(apiResponse.getAccTradeVolume24h());
-            coin.setPriceChange24h(apiResponse.getPriceChange24h());
-            coin.setPriceChangePercentage24h(apiResponse.getPriceChangePercentage24h());
-            coin.setLastUpdated(LocalDateTime.now());
+        // 한 번에 10개씩 끊어서 처리
+        for (int i = 0; i < markets.size(); i += 10) {
+            List<String> batch = markets.subList(i, Math.min(i + 10, markets.size()));
 
-            // 데이터베이스에 저장
-            coin = cryptoCoinRepository.save(coin);
-
-            // 가격 데이터 저장
-            PriceData priceData = new PriceData();
-            priceData.setCoin(coin);
-            priceData.setPrice(apiResponse.getTradePrice());
-            priceData.setVolume(apiResponse.getTradeVolume());
-            priceData.setTimestamp(LocalDateTime.now());
-            
-            priceDataRepository.save(priceData);
-
-            log.debug("코인 데이터 처리 완료: {} - 가격: {}", symbol, apiResponse.getTradePrice());
-            
-        } catch (Exception e) {
-            log.error("코인 데이터 처리 중 오류 발생: {} - {}", apiResponse.getSymbol(), e.getMessage(), e);
-        }
-    }
-
-    /**
-     * 특정 코인의 과거 가격 데이터를 수집합니다.
-     */
-    public void collectHistoricalData(String market, int count) {
-        try {
-            String url = String.format("%s/candles/minutes/1?market=%s&count=%d", 
-                upbitBaseUrl, market, count);
-            
-            List<UpbitApiResponse> historicalData = webClient.get()
-                .uri(url)
-                .retrieve()
-                .bodyToFlux(UpbitApiResponse.class)
-                .collectList()
-                .block();
-
-            if (historicalData != null) {
-                CryptoCoin coin = cryptoCoinRepository.findByCoinId(market.split("-")[1].toLowerCase())
-                    .orElse(null);
-                
-                if (coin != null) {
-                    for (UpbitApiResponse data : historicalData) {
-                        PriceData priceData = new PriceData();
-                        priceData.setCoin(coin);
-                        priceData.setPrice(data.getTradePrice());
-                        priceData.setVolume(data.getTradeVolume());
-                        priceData.setTimestamp(LocalDateTime.now()); // 실제로는 timestamp를 사용해야 함
-                        
-                        priceDataRepository.save(priceData);
-                    }
-                    log.info("{} 코인의 과거 데이터 {}개 수집 완료", market, historicalData.size());
-                }
-            }
-        } catch (Exception e) {
-            log.error("과거 데이터 수집 중 오류 발생: {} - {}", market, e.getMessage(), e);
-        }
-    }
-
-    /**
-     * 모든 코인의 과거 데이터를 수집합니다.
-     */
-    public void collectAllHistoricalData() {
-        for (String market : TARGET_COINS) {
-            collectHistoricalData(market, 200); // 최근 200개 데이터
             try {
-                Thread.sleep(100); // API 호출 제한을 위한 대기
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                break;
+                // 1. 가격 정보는 batch로 한 번에 가져오기
+                String tickerUrl = String.format("https://api.upbit.com/v1/ticker?markets=%s", String.join(",", batch));
+                JSONArray tickerArr = new JSONArray(restTemplate.getForObject(tickerUrl, String.class));
+
+                // 2. 각 마켓별 캔들 데이터 가져오기
+                for (int j = 0; j < batch.size(); j++) {
+                    String market = batch.get(j);
+                    JSONObject ticker = tickerArr.getJSONObject(j);
+
+                    // 캔들 API 호출 (속도 제한 적용)
+                    rateLimit(); // 요청 전 대기
+                    String candleUrl = String.format("https://api.upbit.com/v1/candles/minutes/1?market=%s&count=200", market);
+                    JSONArray candles = new JSONArray(restTemplate.getForObject(candleUrl, String.class));
+
+                    List<Double> prices = new ArrayList<>();
+                    List<Double> volumes = new ArrayList<>();
+                    for (int k = candles.length() - 1; k >= 0; k--) {
+                        JSONObject candle = candles.getJSONObject(k);
+                        prices.add(candle.getDouble("trade_price"));
+                        volumes.add(candle.getDouble("candle_acc_trade_volume"));
+                    }
+
+                    // 기술 분석 실행
+                    Map<String, Object> analysis = technicalAnalysisService.analyze(prices, volumes);
+                    analysis.put("symbol", market);
+                    analysis.put("price", ticker.getDouble("trade_price"));
+
+                    results.add(analysis);
+
+                    // 캔들 API 호출 간격 유지
+                    rateLimit();
+                }
+
+            } catch (Exception e) {
+                log.error("Error fetching batch market analysis: {}", e.getMessage(), e);
             }
         }
-    }
 
-    /**
-     * 스케줄링된 데이터 수집 (5분마다)
-     */
-    @Scheduled(fixedRate = 300000) // 5분 = 300,000ms
-    public void scheduledDataCollection() {
-        log.info("스케줄된 데이터 수집 시작");
-        collectCurrentData();
+        return results;
     }
+    
+    public List<String> getAllKrwMarkets() {
+        String url = "https://api.upbit.com/v1/market/all?isDetails=false";
+        String response = restTemplate.getForObject(url, String.class);
 
-    /**
-     * 수동으로 데이터 수집을 트리거합니다.
-     */
-    public void triggerDataCollection() {
-        log.info("수동 데이터 수집 트리거");
-        collectCurrentData();
+        org.json.JSONArray arr = new org.json.JSONArray(response);
+        return java.util.stream.IntStream.range(0, arr.length())
+                .mapToObj(i -> arr.getJSONObject(i).getString("market"))
+                .filter(m -> m.startsWith("KRW-"))
+                .collect(Collectors.toList());
     }
-} 
+    private synchronized void rateLimit() {
+        long now = System.currentTimeMillis();
+        long waitTime = REQUEST_INTERVAL_MS - (now - lastRequestTime);
+        if (waitTime > 0) {
+            try {
+                Thread.sleep(waitTime);
+            } catch (InterruptedException ignored) {}
+        }
+        lastRequestTime = System.currentTimeMillis();
+    }
+    
+}

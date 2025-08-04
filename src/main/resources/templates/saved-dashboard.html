@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Saved Crypto Data</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script th:src="@{/js/saved-dashboard.js(v=${ts})}"></script>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        #charts { display: flex; gap: 40px; }
+        #savedTable { border-collapse: collapse; width: 100%; margin-top: 20px; }
+        #savedTable th, #savedTable td { border: 1px solid #ccc; padding: 8px; text-align: center; }
+        #savedTable th { background-color: #f4f4f4; }
+    </style>
+</head>
+<body>
+<h1>Saved Crypto Data Dashboard</h1>
+<div id="charts">
+    <canvas id="savedPriceChart" width="600" height="300"></canvas>
+    <canvas id="savedVolumeChart" width="600" height="300"></canvas>
+</div>
+
+<h2>Saved Market Data</h2>
+<button onclick="filterBuyCandidates()">매수 후보 보기</button>
+<button onclick="loadSavedData()">전체 보기</button>
+<table id="savedTable">
+    <thead>
+    <tr>
+        <th>Symbol</th>
+        <th>Price</th>
+        <th>Market Cap</th>
+        <th>Volume 24h</th>
+        <th>Pump Score</th>
+        <th>Trend</th>
+        <th>Risk Level</th>
+        <th>Last Updated</th>
+    </tr>
+    </thead>
+    <tbody></tbody>
+</table>
+
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        loadSavedData();
+        setInterval(loadSavedData, 30000); // 30초마다 갱신
+    });
+</script>
+</body>
+</html>

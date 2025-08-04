@@ -1,32 +1,32 @@
 package com.altradar.service;
 
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.stream.Collectors;
+
+import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestTemplate;
+
 import com.altradar.model.CryptoCoin;
 import com.altradar.model.PriceData;
 import com.altradar.model.dto.CryptoApiResponse;
 import com.altradar.repository.CryptoCoinRepository;
 import com.altradar.repository.PriceDataRepository;
-import com.altradar.util.TechnicalAnalysisUtil;
+
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.stereotype.Service;
-import org.springframework.web.reactive.function.client.WebClient;
-import reactor.core.publisher.Mono;
-
-import java.math.BigDecimal;
-import java.time.LocalDateTime;
-import java.util.List;
-import java.util.Optional;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
 @Slf4j
 public class CryptoDataService {
     
-    private final WebClient webClient;
+    private final RestTemplate restTemplate;
     private final CryptoCoinRepository cryptoCoinRepository;
     private final PriceDataRepository priceDataRepository;
-    private final TechnicalAnalysisService technicalAnalysisService;
+    private final UpbitDataService upbitDataService;
     
     private static final String COINGECKO_BASE_URL = "https://api.coingecko.com/api/v3";
     
@@ -35,14 +35,13 @@ public class CryptoDataService {
      */
     public List<CryptoApiResponse> getTopCoins(int limit) {
         try {
-            return webClient.get()
-                    .uri(COINGECKO_BASE_URL + "/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=" + limit + "&page=1&sparkline=false")
-                    .retrieve()
-                    .bodyToMono(CryptoApiResponse[].class)
-                    .map(List::of)
-                    .block();
+            String url = COINGECKO_BASE_URL + "/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=" 
+                         + limit + "&page=1&sparkline=false";
+
+            CryptoApiResponse[] response = restTemplate.getForObject(url, CryptoApiResponse[].class);
+            return response != null ? List.of(response) : List.of();
         } catch (Exception e) {
-            log.error("상위 코인 데이터 수집 중 오류: {}", e.getMessage());
+            log.error("상위 코인 데이터 수집 중 오류: {}", e.getMessage(), e);
             return List.of();
         }
     }
@@ -52,17 +51,13 @@ public class CryptoDataService {
      */
     public List<PriceData> getCoinPriceData(String coinId, int days) {
         try {
-            String url = String.format("%s/coins/%s/market_chart?vs_currency=usd&days=%d", 
+            String url = String.format("%s/coins/%s/market_chart?vs_currency=usd&days=%d",
                     COINGECKO_BASE_URL, coinId, days);
-            
-            return webClient.get()
-                    .uri(url)
-                    .retrieve()
-                    .bodyToMono(String.class)
-                    .map(this::parsePriceData)
-                    .block();
+
+            String jsonResponse = restTemplate.getForObject(url, String.class);
+            return parsePriceData(jsonResponse);
         } catch (Exception e) {
-            log.error("{} 코인 가격 데이터 수집 중 오류: {}", coinId, e.getMessage());
+            log.error("{} 코인 가격 데이터 수집 중 오류: {}", coinId, e.getMessage(), e);
             return List.of();
         }
     }
@@ -108,33 +103,7 @@ public class CryptoDataService {
         }
     }
     
-    /**
-     * 모든 상위 코인을 업데이트합니다
-     */
-    public void updateAllTopCoins(int limit) {
-        List<CryptoApiResponse> topCoins = getTopCoins(limit);
-        
-        for (CryptoApiResponse coinData : topCoins) {
-            try {
-                CryptoCoin savedCoin = saveOrUpdateCoin(coinData);
-                
-                // 가격 데이터 수집 및 저장
-                List<PriceData> priceDataList = getCoinPriceData(coinData.getId(), 30);
-                if (!priceDataList.isEmpty()) {
-                    savePriceData(savedCoin, priceDataList);
-                    
-                    // 기술적 분석 수행
-                    technicalAnalysisService.analyzeAndUpdateCoin(savedCoin);
-                }
-                
-                // API 호출 제한을 위한 지연
-                Thread.sleep(1000);
-                
-            } catch (Exception e) {
-                log.error("{} 코인 업데이트 중 오류: {}", coinData.getId(), e.getMessage());
-            }
-        }
-    }
+    
     
     /**
      * API 응답을 파싱하여 PriceData 리스트로 변환합니다
@@ -143,5 +112,40 @@ public class CryptoDataService {
         // 실제 구현에서는 JSON 파싱을 수행합니다
         // 여기서는 간단한 예시로 대체합니다
         return List.of();
+    }
+    
+    /**
+     * 업비트 상위 코인 데이터 조회 후 DB 업데이트
+     */
+    public void updateAllTopCoins(int limit) {
+        try {
+            // 업비트 마켓 전체 목록 조회
+            String marketsUrl = "https://api.upbit.com/v1/market/all?isDetails=false";
+            String response = restTemplate.getForObject(marketsUrl, String.class);
+
+            // JSON 파싱
+            org.json.JSONArray marketsArr = new org.json.JSONArray(response);
+
+            // KRW 마켓만 필터링
+            List<String> markets =
+                    java.util.stream.IntStream.range(0, marketsArr.length())
+                            .mapToObj(i -> marketsArr.getJSONObject(i).getString("market"))
+                            .filter(market -> market.startsWith("KRW-"))
+                            .limit(limit) // 상위 limit 개만
+                            .collect(Collectors.toList());
+
+            // 분석 실행
+            List<Map<String, Object>> analysisResults = upbitDataService.getMultipleMarketAnalysis(markets);
+
+            // DB 저장/업데이트
+            for (Map<String, Object> analysis : analysisResults) {
+                CryptoCoin coin = CryptoCoin.fromAnalysisResult(analysis);
+                cryptoCoinRepository.save(coin);
+            }
+
+            log.info("총 {}개 코인 데이터 업데이트 완료", markets.size());
+        } catch (Exception e) {
+            log.error("코인 데이터 업데이트 중 오류: {}", e.getMessage(), e);
+        }
     }
 } 

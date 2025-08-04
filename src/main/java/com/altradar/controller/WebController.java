@@ -20,6 +20,12 @@ public class WebController {
     
     private final CryptoCoinRepository cryptoCoinRepository;
     
+    @GetMapping("/saved-dashboard")
+    public String savedDashboard() {
+        // templates/saved-dashboard.html 렌더링
+        return "saved-dashboard";
+    }
+    
     /**
      * 메인 대시보드 페이지
      */
@@ -49,6 +55,7 @@ public class WebController {
         model.addAttribute("topPumpCoins", topPumpResults);
         model.addAttribute("bullishCoins", bullishResults);
         model.addAttribute("smallCapCoins", smallCapResults);
+        model.addAttribute("ts", System.currentTimeMillis());
         
         return "dashboard";
     }

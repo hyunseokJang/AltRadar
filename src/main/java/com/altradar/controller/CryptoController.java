@@ -1,19 +1,26 @@
 package com.altradar.controller;
 
+import java.math.BigDecimal;
+import java.util.List;
+import java.util.stream.Collectors;
+
+import org.springframework.http.ResponseEntity;
+import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
 import com.altradar.model.CryptoCoin;
 import com.altradar.model.dto.PumpAnalysisResult;
 import com.altradar.repository.CryptoCoinRepository;
 import com.altradar.service.CryptoDataService;
 import com.altradar.service.TechnicalAnalysisService;
+
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.ResponseEntity;
-import org.springframework.scheduling.annotation.Scheduled;
-import org.springframework.web.bind.annotation.*;
-
-import java.math.BigDecimal;
-import java.util.List;
-import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/crypto")
@@ -185,7 +192,7 @@ public class CryptoController {
         try {
             return cryptoCoinRepository.findByCoinId(coinId)
                     .map(coin -> {
-                        technicalAnalysisService.analyzeAndUpdateCoin(coin);
+                    	 // 분석 호출 제거
                         return ResponseEntity.ok(coin.getSymbol() + " 코인 분석이 완료되었습니다.");
                     })
                     .orElse(ResponseEntity.notFound().build());

@@ -1,77 +1,22 @@
-spring:
-  application:
-    name: altradar
-  
-  datasource:
-    url: jdbc:h2:mem:altradar
-    driver-class-name: org.h2.Driver
-    username: sa
-    password: 
-  
-  h2:
-    console:
-      enabled: true
-      path: /h2-console
-  
-  jpa:
-    hibernate:
-      ddl-auto: create-drop
-    show-sql: false
-    properties:
-      hibernate:
-        dialect: org.hibernate.dialect.H2Dialect
-        format_sql: true
-        use_sql_comments: true
-  
-  thymeleaf:
-    cache: false
-    prefix: classpath:/templates/
-    suffix: .html
-    encoding: UTF-8
-    mode: HTML
 
 server:
   port: 8080
-  servlet:
-    context-path: /
+
+spring:
+  thymeleaf:
+    cache: false
 
 logging:
   level:
+    root: INFO
     com.altradar: DEBUG
-    org.springframework.web: DEBUG
-    org.hibernate.SQL: DEBUG
-    org.hibernate.type.descriptor.sql.BasicBinder: TRACE
 
-# Upbit API 설정
 upbit:
+  markets:
+    - KRW-BTC
+    - KRW-ETH
+    - KRW-XRP
   api:
-    base-url: https://api.upbit.com/v1
-    rate-limit: 600 # 분당 요청 제한
-    request-delay: 100 # 요청 간 대기 시간 (ms)
-
-# CoinGecko API 설정
-coingecko:
-  api:
-    base-url: https://api.coingecko.com/api/v3
-    rate-limit: 1000 # API 호출 제한 (밀리초)
-
-# 기술적 분석 설정
-technical-analysis:
-  rsi-period: 14
-  macd-fast: 12
-  macd-slow: 26
-  macd-signal: 9
-  sma-short: 20
-  sma-long: 50
-  bollinger-period: 20
-  bollinger-std: 2
-  volatility-period: 20
-  momentum-period: 10
-
-# 펌프 예측 설정
-pump-prediction:
-  min-volume: 1000000 # 최소 거래량 (KRW)
-  min-price-change: 5.0 # 최소 가격 변화율 (%)
-  rsi-oversold: 30
-  rsi-overbought: 70
-  volatility-threshold: 0.1 
+    candle-url: "https://api.upbit.com/v1/candles/minutes/1?market=%s&count=200"
+    ticker-url: "https://api.upbit.com/v1/ticker?markets=%s"
+  refresh-interval-seconds: 10
