@@ -81,6 +81,25 @@
         .success { color: #4CAF50; }
         .error { color: #f44336; }
         .info { color: #2196F3; }
+
+        /* 데이터 테이블 스타일 */
+        table {
+            width: 100%;
+            margin-top: 20px;
+            background: white;
+            color: black;
+            border-collapse: collapse;
+            font-size: 12px;
+        }
+        table th, table td {
+            border: 1px solid #ddd;
+            padding: 4px;
+            text-align: right;
+        }
+        table th {
+            background: #f2f2f2;
+            text-align: center;
+        }
     </style>
 </head>
 <body>
@@ -108,6 +127,20 @@
             <div class="log" id="log">
                 <div class="info">로그가 여기에 표시됩니다...</div>
             </div>
+
+            <!-- 실시간 데이터 테이블 -->
+            <table id="dataTable">
+                <thead>
+                    <tr>
+                        <th>심볼</th>
+                        <th>현재가</th>
+                        <th>MA5</th>
+                        <th>MA20</th>
+                        <th>RSI</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
         </div>
         
         <div class="api-links">
@@ -130,6 +163,33 @@
             log.appendChild(div);
             log.scrollTop = log.scrollHeight;
         }
+
+        function renderTable(data) {
+            const tbody = document.querySelector('#dataTable tbody');
+            tbody.innerHTML = ''; // 초기화
+            if (!data) return;
+
+            data.forEach(item => {
+                const isBuy = (item.rsi <= 40) && (item.ma5 > item.ma20) && (item.price > item.ma5);
+                const isSell = (item.rsi >= 70) || (item.ma5 < item.ma20);
+
+                let rowColor = '';
+                if (isBuy) {
+                    rowColor = 'background-color: yellow;'; // 매수 신호
+                } else if (isSell) {
+                    rowColor = 'background-color: pink;'; // 매도 신호
+                }
+
+                const row = `<tr style="${rowColor}">
+                    <td style="text-align:center">${item.symbol}</td>
+                    <td>${item.price?.toLocaleString()}</td>
+                    <td>${item.ma5?.toLocaleString()}</td>
+                    <td>${item.ma20?.toLocaleString()}</td>
+                    <td>${item.rsi?.toFixed(2)}</td>
+                </tr>`;
+                tbody.innerHTML += row;
+            });
+        }
         
         async function collectCurrentData() {
             try {
@@ -137,15 +197,14 @@
                 
                 const response = await fetch('/api/upbit/collect', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    }
+                    headers: { 'Content-Type': 'application/json' }
                 });
                 
                 const result = await response.json();
                 
                 if (result.status === 'success') {
                     addLog('✅ ' + result.message, 'success');
+                    renderTable(result.data);
                 } else {
                     addLog('❌ ' + result.message, 'error');
                 }
@@ -160,15 +219,14 @@
                 
                 const response = await fetch('/api/upbit/collect/historical', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    }
+                    headers: { 'Content-Type': 'application/json' }
                 });
                 
                 const result = await response.json();
                 
                 if (result.status === 'success') {
                     addLog('✅ ' + result.message, 'success');
+                    renderTable([result.data]); // 단일 마켓 데이터
                 } else {
                     addLog('❌ ' + result.message, 'error');
                 }
@@ -195,4 +253,4 @@
         }
     </script>
 </body>
-</html> 
+</html>

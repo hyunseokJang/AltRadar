@@ -10,8 +10,9 @@ logging:
   level:
     root: INFO
     com.altradar: DEBUG
-
 upbit:
+  accessKey: YOUR_ACCESS_KEY
+  secretKey: YOUR_SECRET_KEY
   markets:
     - KRW-BTC
     - KRW-ETH
